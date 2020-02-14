@@ -2,13 +2,12 @@
 
 ------------------------- Virtual Box setting -------------------------
 > setting Network attached to Bridged Adapter
-> size of the virtual hard disk 12gb
+> size of the virtual hard disk 8gb
 
 ------------------------- OS Installation -------------------------
 > Shin as hostname
 > Setup loot password as 1231
 > Username as hyshin
-> set Partition disk as 4.6gb for / (root) , 1.1gb for swap, rest 7.2 gb for /home
 > for software selection, only chose web server, SSH server, standard system utilities
 
 ------------------------- Setup & install -------------------------
@@ -46,7 +45,6 @@ iface lo inet loopback
 allow-hotplug enp0s3
 iface enp0s3 inet dhcp
 
-, , add user / sudo useradd <username>
 
 /// end output
 
@@ -58,7 +56,7 @@ create a file and edit "/etc/network/interfaces.d/enp0s3" with:
 
 ///content start
 	iface enp0s3 inet static
-	address 10.13.200.198
+	address 10.13.200.247
 	netmask	255.255.255.252
 	gateway	10.13.254.254
 ///content end
@@ -70,12 +68,12 @@ check your ip now:
 > ip a
 
 connect the SSH service in remote terminal:
-> ssh hyshin@10.13.200.198
+> ssh hyshin@10.13.200.247
 
 ------------------------- Change SSH default port -------------------------
 > sudo vim /etc/ssh/sshd_config (NOT ssh_config!!)
 
-Change line "Port 22" to "Port 54321" and if this line has "#" take it away
+Change line 13 "Port 22" to "Port 54321" and if this line has "#" take it away
 
 Port numbers are assigned in various ways, based on three ranges: System Ports (0-1023) this is forbidden to use, User Ports (1024-49151) this should be avoided as well, and the Dynamic and/or Private Ports (49152-65535) this range can be used;
 available information here: https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml
@@ -162,74 +160,57 @@ Now, restart ufw service:
 
 Source: https://www.digitalocean.com/community/tutorials/how-to-setup-a-firewall-with-ufw-on-an-ubuntu-and-debian-cloud-server
 
-------------------------- Set up DOS protection with failban -------------------------
+------------------------- Set up DOS protection with fail2ban -------------------------
 
 Check current rules:
-> service fail2ban status
-> sudo cat /etc/fail2ban/jail.d/defaults-debian.conf
+> sudo service fail2ban status
+We need to edit the jail.conf in the fail2ban folder, but we need to make adding
+copy of the fail, otherwise the conf file will reset itself to default.
+<<< sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local >>>
+------------------------------------------------------------------------------
+Now we can edit the jail.local file, the Jail part inside the file should 
+look like this:
+[sshd]
+enabled = true
+port    = ssh 
+logpath = %(sshd_log)s
+backend = %(sshd_backend)s
+maxretry = 3
+bantime = 600
 
-Add rules to local file to add to and override default rules
-, also local rules won't get overwritten when updated.
+**********#Add after HTTP servers: ***********
 
-Add the following to the /etc/fail2ban/jail.d/jail-debian.local by:
->sudo vim /etc/fail2ban/jail.d/jail-debian.local
-################
+[http-get-dos]
+enabled = true
+port = http,https
+filter = http-get-dos
+logpath = /var/log/apache2/access.log
+maxretry = 300
+findtime = 300
+bantime = 600
+action = iptables[name=HTTP, port=http, protocol=tcp]
+------------------------------------------------------------------------------
+Now we need to create a http-get-dos.conf inside this folder 
+sudo vim /etc/fail2ban/filter.d/http-get-dos.conf
+The output should look like this: 
 
-       [sshd]
-        enabled = true
-        port = 54321
-		logpath = %(sshd_log)s
-		backend = %(sshd_backend)s
-        maxretry = 3
-        findtime = 120
-        bantime = 600
+[Definition]
+failregex = ^<HOST> -.*"(GET|POST).
+*ignoreregex =
 
-        [http-get-dos]
-        enabled = true
-        port = http,https
-        filter = http-get-dos
-		logpath = /var/log/apache2/access.log
-        maxretry = 100
-        findtime = 120
-        bantime = 600
-        action = iptables[name=HTTP, port=http, protocol=tcp]
-
-#################
-
-Add regex rules to http-get-dos:
-
-Create a file:
-> sudo touch /etc/fail2ban/filter.d/http-get-dos.conf
-
-And edit it :
-###########
-
-        [Definition]
-        failregex = ^<HOST> -.*"(GET|POST).*
-        ignoreregex = 
-
-############
-
-Regular expressions are used to detect break-in attempts,
-password failures, etc. Regular expressions are looked to
-see if they match the lines of the logfile.
-You can use the predefined entity <HOST> in your regexes.
-<HOST> is an alias for (?:::f{4,6}:)?(?P<host>\S+),
-which matches either a hostname or an IPv4 address
-(possibly embedded in an IPv6 address).
-
-Restart firewall and fail2ban
-
-> sudo ufw reload
-> sudo service fail2ban restart
-
+------------------------------------------------------------------------------
+Last but not least we need to reload our firewall and fail2ban:
+<<< sudo ufw reload >>>
+<<< sudo service fail2ban restart >>>
+------------------------------------------------------------------------------
 We can test if the new conf works with SlowLoris (an HTTP DDOS attack script)
-    install git: <<< sudo apt-get install git >>>
-    install SlowLoris: <<< git clone https://github.com/gkbrk/slowloris.git slowloris>>>
-    Go slowloris directory Run the program: python3 slowloris.py 10.13.200.247
-
-To check ban:
-> sudo cat /var/log/fail2ban.log
+install git: <<< sudo apt-get install git >>>
+install SlowLoris: <<< git clone https://github.com/gkbrk/slowloris.git >>>
+Run the program: perl slowloris.py 10.13.200.**
+-----------------------------------------------------------------------------
+To see if our new fail2ban conf actually works we need to check the following
+file: ~/var/log/fail2ban.log 
+#################
 
 ------------------------- Setting up protection agains port scans -------------------------
 
@@ -246,7 +227,7 @@ In standard mode portsentry runs in the background and reports any violations, i
 
 > sudo vim /etc/default/portsentry
 
-change tcp and udp to atcp and aupd (advanced) or overwrite with file resources/portsentry
+change tcp and udp to atcp and audp (advanced) or overwrite with file resources/portsentry
 
 > sudo vim /etc/portsentry/portsentry.conf
 
