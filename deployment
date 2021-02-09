@@ -169,7 +169,7 @@ copy of the fail, otherwise the conf file will reset itself to default.
 <<< sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local >>>
 ------------------------------------------------------------------------------
 Now we can edit the jail.local file, the Jail part inside the file should 
-look like this:
+look like this: (on line 238)
 [sshd]
 enabled = true
 port    = ssh 
