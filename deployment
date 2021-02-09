@@ -8,7 +8,7 @@
 > Shin as hostname
 > Setup loot password as 1231
 > Username as hyshin
-> for software selection, only chose web server, SSH server, standard system utilities
+> for software selection, only chose web server, SSH server, standard system utilities (No need others for this project)
 
 ------------------------- Setup & install -------------------------
 > type su to access root
